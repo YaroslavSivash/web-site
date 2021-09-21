@@ -1,13 +1,14 @@
 package main
 
 import (
+	"YaroslavSivash/web-site/pkg/models/mysql"
 	"database/sql"
 	"flag"
+	_ "github.com/go-sql-driver/mysql" // Новый импорт
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	_ "github.com/go-sql-driver/mysql" // Новый импорт
 )
 
 // Создаем структуру `application` для хранения зависимостей всего веб-приложения.
@@ -16,6 +17,7 @@ import (
 type application struct {
 	errorLog *log.Logger
 	infoLog  *log.Logger
+	notes *mysql.NoteModel
 }
 
 func main() {
@@ -38,9 +40,19 @@ func main() {
 	// названия файла и номера строки где обнаружилась ошибка.
 	errorLog := log.New(os.Stderr, "ERROR\t", log.Ldate|log.Ltime|log.Lshortfile)
 
+	db, err := openDB(*dsn)
+	if err != nil {
+		errorLog.Fatal(err)
+	}
+
+	defer db.Close()
+
 	app := &application{
 		errorLog: errorLog,
 		infoLog: infoLog,
+		notes: &mysql.NoteModel{
+			DB: db,
+		},
 	}
 
 	// Инициализируем новую структуру http.Server. Мы устанавливаем поля Addr и Handler, так
@@ -52,12 +64,7 @@ func main() {
 		ErrorLog: errorLog,
 		Handler:  app.routes(),
 	}
-	db, err := openDB(*dsn)
-	if err != nil {
-		errorLog.Fatal(err)
-	}
 
-	defer db.Close()
 	// Значение, возвращаемое функцией flag.String(), является указателем на значение
 	// из флага, а не самим значением. Нам нужно убрать ссылку на указатель
 	// то есть перед использованием добавьте к нему префикс *. Обратите внимание, что мы используем
